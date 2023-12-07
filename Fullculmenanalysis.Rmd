@@ -1,0 +1,124 @@
+---
+title: "Penguinassignmentanalysis"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-12-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r, echo=TRUE} 
+### In this data analysis I will attempt to assess the difference in the culmen length, or the length of the dorsal ridge of the upper beak mandible, between three species of penguin. These species are the Adelie penguin, Chinstrap penguin and Gentoo penguin. Data was collected at the Palmer Station, Antarctica, by Dr. Kristen Gormer. 
+
+### I hypothesise that species which consume higher levels of krill in their diet will have lower culmen lengths than those which feed more on fish, as longer beaks enable for more effective spearing and catching of larger prey. Therefore, I hypothesize that the Adelie penguin, which mostly eats krill (Tabassum, 2022), will have the shortest culmen length, whereas the Gentoo penguin, which eats the largest proportion of fish and squid (Clausen and Putz, 2003), will have the longest beak length. 
+``` 
+
+```{r, echo=TRUE} 
+install.packages("ggplot2") 
+install.packages("ragg") 
+install.packages("palmerpenguins") 
+install.packages("janitor") 
+install.packages("dplyr")
+library(ggplot2) 
+library(ragg)
+library(palmerpenguins)
+library(janitor)
+library(dplyr) 
+#Here I am loading the packages relevant to this data analysis, including ggplot2 for creating graphical figures, and the palmerpenguins dataset to analyse   
+
+write.csv(penguins_raw, "data/penguins_raw.csv") 
+#Here I am saving my raw data to my data folder
+
+source("functions/cleaning.r") 
+#Here I am loading a list of functions from another R document that will assist me in cleaning my data. For example, a function tiled 'remove_NA' that will remove results listed as non-applicable in the dataset, which could otherwise affect my data analysis 
+
+penguins_clean <- penguins_raw %>%
+    clean_column_names() %>%
+    shorten_species() %>%
+    remove_empty_columns_rows()
+#Here I am using some of the functions I loaded in order to make the raw penguins dataset more readable, including shortening species names to no longer include scientific names, and removing empty columns or rows from the dataset 
+
+write.csv(penguins_clean, "data/penguins_clean.csv") 
+#Here I am saving my cleaned data to my data folder
+
+names(penguins_clean) 
+#This line of code enables me to check the data cleaning process has properly edited the dataset column titles, and shows me what the titles now are 
+
+culmen_length_data <- penguins_clean %>%
+    subset_columns(c("culmen_length_mm", "species","sex")) %>%
+    remove_NA() 
+#Here I am using more functions from the loaded R document, this time for example in order to subset the data into the different penguin species, allowing for comparison across species of culmen length 
+
+head(culmen_length_data) 
+#This line of code allows me to inspect the column headings from the dataset involved in the culmen length analysis, allowing me to identify any problems with the way the data has now been formatted 
+
+``` 
+
+```{r, echo=TRUE} 
+set.seed(0) #Ensuring the random point generation is the same for anyone who runs this code
+culmen_violin <- ggplot(data = culmen_length_data, 
+                          aes(x = species, 
+                              y = culmen_length_mm)) +
+                          geom_violin(aes(color = species)) + #Creating a violin plot using species and culmen length data from the dataset 
+  scale_color_manual(values = c("Adelie" = "coral1", "Chinstrap" = "aquamarine2", "Gentoo" = "darkgreen")) + #Assigning a specific colour to each species
+  geom_jitter(aes(color = species, alpha = 0.25)) + 
+  scale_x_discrete() + #Adding jittered points for each value used to create the graph, with alpha controlling transparency, and ensuring the species category is considered discrete
+  labs(x = "Species", y = "Culmen length (mm)") +
+  theme_bw() + 
+  theme(legend.position = "none") #Labeling the axes in a readable way, giving the graph a black and white colour scheme, and removing the legend 
+agg_png("Figures/culmen_violin.png", width = 20, height = 20, units = "cm", res = 500, scaling = 1) 
+culmen_violin 
+dev.off() #Saving my properly scaled figure into a folder where it can be easily opened and read
+print(culmen_violin) #Showing the graph generated 
+```  
+
+```{r, echo = TRUE} 
+###Now creating a dot plot showing means and confidence intervals for culmen length 
+culmen_dotplot <- ggplot(data = culmen_length_data, 
+                          aes(x = species, 
+                              y = culmen_length_mm), fill = species) +
+                          geom_point(aes(color = species), size = 1.25) + 
+    scale_color_manual(values = c("Adelie" = "coral1", "Chinstrap" = "aquamarine2", "Gentoo" = "darkgreen")) + #Producing a dot plot and editing the aesthetics of dot colour and size
+  stat_summary(fun.data= mean_cl_normal, geom = "crossbar", position = position_dodge(width = 0.1), width = 0.5) + #Analysing the means and confidence intervals for culmen length of each species, and adding this to the figure
+  labs(x = "Species", y = "Culmen length (mm)") +
+  theme_bw() + 
+  theme(legend.position = "none")
+agg_png("Figures/culmen_dotplot", width = 20, height = 20, units = "cm", res = 500, scaling = 1) 
+culmen_dotplot 
+dev.off()  
+print(culmen_dotplot) 
+``` 
+
+```{r, echo = TRUE} 
+#I will now perform a pairwise t-test to find out if the differences in culmen length between species are significant or not 
+pairwise_test_results <- pairwise.t.test(penguins_clean$culmen_length_mm, penguins_clean$species) 
+agg_png("Figures/pairwise_test_results", width = 20, height = 20, units = "cm", res = 500, scaling = 1) 
+dev.off()
+print(pairwise_test_results) #This will produce a table showing levels of significance in differences in culmen length between species
+``` 
+
+```{r, echo = TRUE} 
+###Discussion 
+#Initially by looking at the violin plot it appeared that Adelie penguins had significantly lower culmen lengths than Chinstrap and Gentoo penguins. This was further suggested by the dot plot which showed significantly differing means, but also suggested a potentially significant difference between Chinstrap and Gentoo penguins, something not clear on the violin plot. Further statistical analysis using a pairwise t-test showed significant differences at the 0.5% level in culmen length between all three species, with Adelie having the lowest and Chinstrap having the highest. 
+
+#To conclude, this supports my hypothesis that Adelie penguins would have the shortest culmen length based on diet. However it does not support my hypothesis that Gentoo penguins have the longest, as Chinstrap penguins, which eat larger proportions of krill, had significantly longer culmen lengths. Therefore I suggest that culmen length is a result of more than one lifestyle factor, not solely diet. Further studies with a larger data set could attempt to find if such factors exist, and whether they cause significant differences in culmen length.
+
+#References: Tabassum, N., Lee, J.H., Lee, S.R., Kim, J.U., Park, H., Kim, H.W. and Kim, J.H., 2022. Molecular diet analysis of Adélie penguins (Pygoscelis adeliae) in the Ross Sea using fecal DNA. Biology, 11(2), p.182.,               Clausen, A. and Pütz, K., 2003. Winter diet and foraging range of gentoo penguins (Pygoscelis papua) from Kidney Cove, Falkland Islands. Polar Biology, 26(1), pp.32-40.
+```
